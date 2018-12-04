@@ -1,22 +1,28 @@
 import os
 import base64
+import secrets
 
-from flask import Flask, request
+from flask import Flask, request, session
 from model import Grade 
 
 app = Flask(__name__)
+app.secret_key = os.environ.get('SECRET_KEY').encode()
 
 @app.route('/', methods=['GET', 'POST'])
 def home():
 
+    if 'csrf_token' not in session:
+        session['csrf_token'] = secrets.token_hex(32)
+
     if request.method == 'POST':
-        g = Grade(
-            student=request.form['student'],
-            assignment=request.form['assignment'],
-            grade=request.form['grade'],
-        )
-        #print("(" + request.form['grade'] + ")")
-        g.save()
+        if request.form.get('csrf_token', None) == session['csrf_token']:
+            g = Grade(
+                student=request.form['student'],
+                assignment=request.form['assignment'],
+                grade=request.form['grade'],
+            )
+            #print("(" + request.form['grade'] + ")")
+            g.save()
 
     body = """
 <html>
@@ -34,11 +40,13 @@ def home():
     <label for="grade">Grade</label>
     <input type="text" name="grade"><br>
 
+    <input type="hidden" name="csrf_token" value="{}">
+
     <input type="submit" value="Submit">
 </form>
 
 <h2>Existing Grades</h2>
-"""
+""".format(session['csrf_token'])
     
     for g in Grade.select():
         body += """
